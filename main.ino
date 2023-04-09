@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include "ESP8266WiFi.h"
 #include "Ubidots.h"
+#include "DHT.h"
 
 // API Keys and Passwords
 const char* UBIDOTS_TOKEN = "";  // Put here your Ubidots TOKEN
@@ -13,7 +14,11 @@ const char* WIFI_SSID = "";      // Put here your Wi-Fi SSID
 const char* WIFI_PASS = "";      // Put here your Wi-Fi password
 
 // Variables and Constants
+int DHT_PIN = 2; // PIN D4
+DHT dht(DHT_PIN, DHT11);
+
 Ubidots ubidots(UBIDOTS_TOKEN, UBI_HTTP);
+
 float temperatureLocal = 0.0;
 float temperatureServer = 0.0;
 float humidityLocal = 0.0;
@@ -172,7 +177,8 @@ void fetch_weather_server(){
 }
 
 void fetch_weather_local(){
-
+  temperatureLocal = dht.readTemperature();
+  humidityLocal = dht.readHumidity();
 }
 
 void adjust_time(){
@@ -186,6 +192,7 @@ void adjust_time(){
 void setup() {
   Serial.begin(115200);
   ubidots.wifiConnect(WIFI_SSID, WIFI_PASS);
+  dht.begin();
 }
 
 void loop() {
@@ -207,7 +214,17 @@ void loop() {
   Serial.print("Humidity Server: ");
   Serial.print(humidityServer);
   Serial.println(" RH");
-  
+
+  fetch_weather_local();
+
+  Serial.print("Temperature Local: ");
+  Serial.print(temperatureLocal);
+  Serial.println(" °C");
+
+  Serial.print("Humidity Local: ");
+  Serial.print(humidityLocal);
+  Serial.println(" RH");
+
   delay(200000);
 }
 
