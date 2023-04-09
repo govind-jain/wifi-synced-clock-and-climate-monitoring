@@ -1,9 +1,11 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
 #include <ArduinoJson.h>
+#include <SPI.h>  // not used here, but needed to prevent a RTClib compile error
 #include "ESP8266WiFi.h"
 #include "Ubidots.h"
 #include "DHT.h"
+#include "RTClib.h"
 
 // API Keys and Passwords
 const char* UBIDOTS_TOKEN = "";  // Put here your Ubidots TOKEN
@@ -19,6 +21,8 @@ DHT dht(DHT_PIN, DHT11);
 
 Ubidots ubidots(UBIDOTS_TOKEN, UBI_HTTP);
 
+RTC_DS1307 RTC;  // Setting up an instance of DS1307 naming it RTC
+
 float temperatureLocal = 0.0;
 float temperatureServer = 0.0;
 float humidityLocal = 0.0;
@@ -26,6 +30,7 @@ float humidityServer = 0.0;
 double latitude = 0.0;
 double longitude = 0.0;
 double accuracy = 0.0;
+String timeRTC = "";
 
 /****************************************
  * Auxiliar Functions
@@ -181,8 +186,53 @@ void fetch_weather_local(){
   humidityLocal = dht.readHumidity();
 }
 
-void adjust_time(){
+void fetch_time_server(){
 
+  const char* time_api_url = "api.timezonedb.com";
+
+  WiFiClient client;
+
+  // Make the HTTP request to the time API
+  if (client.connect(time_api_url, 80)) {
+    client.print(String("GET /v2.1/get-time-zone?key=") + TIMEZONEDB_API_KEY
+                  + "&format=json&by=position&lat=" + latitude
+                  + "&lng=" + longitude
+                  + " HTTP/1.1\r\n"
+                  + "Host: " + time_api_url + "\r\n"
+                  + "Connection: close\r\n\r\n"
+    );
+
+    // wait for response from server
+    while (!client.available());
+
+    while (client.available()) {
+      String line = client.readStringUntil('\r');
+      line.trim();
+
+      if(line.indexOf("formatted") != -1){
+        StaticJsonDocument<512> doc;
+
+        DeserializationError error = deserializeJson(doc, line);
+
+        if(error) {
+          Serial.print(F("deserializeJson() failed while fetching time: "));
+          Serial.println(error.f_str());
+          return;
+        }
+
+        const char* iso8601dateTime = doc["formatted"]; // "2023-04-08 19:54:11"
+        RTC.adjust(DateTime(iso8601dateTime));
+        Serial.println("Time and Date is set on Real Time Clock");
+      }
+    }
+  }
+  else {
+    Serial.println("Failed to connect to time API.");
+  }
+}
+
+void fetch_time_local(){
+  
 }
 
 /****************************************
@@ -193,6 +243,7 @@ void setup() {
   Serial.begin(115200);
   ubidots.wifiConnect(WIFI_SSID, WIFI_PASS);
   dht.begin();
+  RTC.begin();  // Initialize RTC
 }
 
 void loop() {
@@ -224,6 +275,9 @@ void loop() {
   Serial.print("Humidity Local: ");
   Serial.print(humidityLocal);
   Serial.println(" RH");
+
+  fetch_time_server(); // Fetch time from server and adjust this time on RTC
+  fetch_time_local(); // Fetch time from RTC
 
   delay(200000);
 }
