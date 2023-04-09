@@ -31,6 +31,7 @@ double latitude = 0.0;
 double longitude = 0.0;
 double accuracy = 0.0;
 String timeRTC = "";
+String dateRTC = "";
 
 /****************************************
  * Auxiliar Functions
@@ -128,6 +129,13 @@ void fetch_location_server(){
   Serial.println("closing connection with Geolocation Server");
   Serial.println();
   client.stop();
+
+  Serial.print("Latitude = ");
+  Serial.println(latitude, 8);
+  Serial.print("Longitude = ");
+  Serial.println(longitude, 8);
+  Serial.print("Accuracy = ");
+  Serial.println(accuracy, 3);
 }
 
 void fetch_weather_server(){
@@ -179,11 +187,26 @@ void fetch_weather_server(){
       Serial.println("Connection failed to Weather Server");
   }
 
+  Serial.print("Temperature Server: ");
+  Serial.print(temperatureServer);
+  Serial.println(" °C");
+
+  Serial.print("Humidity Server: ");
+  Serial.print(humidityServer);
+  Serial.println(" RH");
 }
 
 void fetch_weather_local(){
   temperatureLocal = dht.readTemperature();
   humidityLocal = dht.readHumidity();
+
+  Serial.print("Temperature Local: ");
+  Serial.print(temperatureLocal);
+  Serial.println(" °C");
+
+  Serial.print("Humidity Local: ");
+  Serial.print(humidityLocal);
+  Serial.println(" RH");
 }
 
 void fetch_time_server(){
@@ -222,7 +245,9 @@ void fetch_time_server(){
 
         const char* iso8601dateTime = doc["formatted"]; // "2023-04-08 19:54:11"
         RTC.adjust(DateTime(iso8601dateTime));
-        Serial.println("Time and Date is set on Real Time Clock");
+
+        Serial.print("RTC adjusted to iso8601dateTime: ");
+        Serial.println(iso8601dateTime);
       }
     }
   }
@@ -232,7 +257,15 @@ void fetch_time_server(){
 }
 
 void fetch_time_local(){
-  
+  DateTime now = RTC.now();
+  timeRTC = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second());
+  dateRTC = String(now.day()) + "/" + String(now.month()) + "/" + String(now.year());
+
+  Serial.print("Time RTC: ");
+  Serial.println(timeRTC);
+
+  Serial.print("Date RTC: ");
+  Serial.println(dateRTC);
 }
 
 /****************************************
@@ -244,42 +277,19 @@ void setup() {
   ubidots.wifiConnect(WIFI_SSID, WIFI_PASS);
   dht.begin();
   RTC.begin();  // Initialize RTC
+  fetch_location_server();
 }
 
 void loop() {
-  fetch_location_server();
-
-  Serial.print("Latitude = ");
-  Serial.println(latitude, 8);
-  Serial.print("Longitude = ");
-  Serial.println(longitude, 8);
-  Serial.print("Accuracy = ");
-  Serial.println(accuracy, 3);
-
   fetch_weather_server();
-
-  Serial.print("Temperature Server: ");
-  Serial.print(temperatureServer);
-  Serial.println(" °C");
-
-  Serial.print("Humidity Server: ");
-  Serial.print(humidityServer);
-  Serial.println(" RH");
 
   fetch_weather_local();
 
-  Serial.print("Temperature Local: ");
-  Serial.print(temperatureLocal);
-  Serial.println(" °C");
-
-  Serial.print("Humidity Local: ");
-  Serial.print(humidityLocal);
-  Serial.println(" RH");
-
   fetch_time_server(); // Fetch time from server and adjust this time on RTC
+
   fetch_time_local(); // Fetch time from RTC
 
-  delay(200000);
+  delay(600000);
 }
 
 // double value1 = random(0, 9) * 10;
