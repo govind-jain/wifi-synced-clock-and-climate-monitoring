@@ -1,13 +1,14 @@
-#include "Ubidots.h"
 #include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
 #include <ArduinoJson.h>
 #include "ESP8266WiFi.h"
+#include "Ubidots.h"
 
 // API Keys and Passwords
 const char* UBIDOTS_TOKEN = "";  // Put here your Ubidots TOKEN
 String GEOLOCATION_API_KEY = "";
 const char* TIMEZONEDB_API_KEY = "";
-const char* OPENWEATHERMAP_API_KEY = "Your_API_Key";
+const char* OPEN_WEATHER_MAP_API_KEY = "";
 const char* WIFI_SSID = "";      // Put here your Wi-Fi SSID
 const char* WIFI_PASS = "";      // Put here your Wi-Fi password
 
@@ -60,7 +61,7 @@ void fetch_location_server(){
   requestBody += ("}\n");
 
   //Connect to the client and make the api call
-  Serial.print("Requesting URL: ");
+  Serial.print("Requesting for Location to URL: ");
   Serial.println("https://" + (String)Geolocation_Host + requestPage + GEOLOCATION_API_KEY);
   Serial.println(" ");
   delay(500);
@@ -68,7 +69,7 @@ void fetch_location_server(){
   WiFiClientSecure client;
   client.setInsecure();
   if (client.connect(Geolocation_Host, 443)) {
-    Serial.println("Connected to port");
+    Serial.println("Connected to Geolocation port");
     client.println("POST " + requestPage + GEOLOCATION_API_KEY + " HTTP/1.1");
     client.println("Host: " + (String)Geolocation_Host);
     client.println("Connection: close");
@@ -81,7 +82,7 @@ void fetch_location_server(){
     delay(500);
   }
   else{
-    Serial.println("Connection failed to port");
+    Serial.println("Connection failed to Geolocation port");
     return;
   }
 
@@ -114,16 +115,63 @@ void fetch_location_server(){
     }
   }
 
-  Serial.println("closing connection");
+  Serial.println("closing connection with Geolocation Server");
   Serial.println();
   client.stop();
 }
 
-void fetch_weather_local(){
+void fetch_weather_server(){
+
+  const char* weatherServer = "api.openweathermap.org";
+
+  WiFiClient client;
+
+  // Make a HTTP request to the OpenWeatherMap API
+  if (client.connect(weatherServer, 80)) {
+      String url = "/data/2.5/weather?lat=";
+      url += latitude;
+      url += "&lon=";
+      url += longitude;
+      url += "&units=metric&appid=";
+      url += OPEN_WEATHER_MAP_API_KEY;
+
+      Serial.print("Requesting for Weather to URL: ");
+      Serial.println(url);
+
+      client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                    "Host: " + weatherServer + "\r\n" +
+                    "Connection: close\r\n\r\n");
+      delay(500);
+
+      StaticJsonDocument<1024> doc;
+
+      while(client.available()) {
+          String line = client.readStringUntil('\r');
+          line.trim();
+
+          if (line.startsWith("{\"coord\":")){
+              DeserializationError error = deserializeJson(doc, line);
+
+              if(error) {
+                  Serial.println(F("Failed to parse response from Weather Server"));
+                  return;
+              }
+
+              break;
+          }
+      }
+
+      // Extract the temperature and humidity values from the JSON response
+      temperatureServer = doc["main"]["temp"];
+      humidityServer = doc["main"]["humidity"];
+  }
+  else {
+      Serial.println("Connection failed to Weather Server");
+  }
 
 }
 
-void fetch_weather_server(){
+void fetch_weather_local(){
 
 }
 
@@ -138,14 +186,29 @@ void adjust_time(){
 void setup() {
   Serial.begin(115200);
   ubidots.wifiConnect(WIFI_SSID, WIFI_PASS);
-  ubidots.setDebug(true);  // Uncomment this line for printing debug messages
 }
 
 void loop() {
+  fetch_location_server();
 
+  Serial.print("Latitude = ");
+  Serial.println(latitude, 8);
+  Serial.print("Longitude = ");
+  Serial.println(longitude, 8);
+  Serial.print("Accuracy = ");
+  Serial.println(accuracy, 3);
+
+  fetch_weather_server();
+
+  Serial.print("Temperature Server: ");
+  Serial.print(temperatureServer);
+  Serial.println(" °C");
+
+  Serial.print("Humidity Server: ");
+  Serial.print(humidityServer);
+  Serial.println(" RH");
   
-
-  delay(5000);
+  delay(200000);
 }
 
 // double value1 = random(0, 9) * 10;
