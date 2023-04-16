@@ -3,6 +3,15 @@
 
 In this project, we will periodically collect the temprature and humidity for the nearby location of the device via local sensors as well as via API calls to Weather servers. We will send these data to an IoT cloud platform and plot the data. We will also process the data there to perform the desired actions.
 
+## Architecture and Connections
+
+![Architecture](https://user-images.githubusercontent.com/106254063/232279503-4e8e1df1-c47c-45db-acc8-03b695ab1f7b.png)
+
+## IoT Dashboard Plots
+
+![Temperature](https://user-images.githubusercontent.com/106254063/232279872-c907f088-78df-4be6-9d9a-7d16e10b26a9.png)
+
+![Humidity](https://user-images.githubusercontent.com/106254063/232279874-5f224a34-c7e9-4129-97b4-e001dd6055ab.png)
 
 ## Hardware's and API's used
 
@@ -18,10 +27,12 @@ In this project, we will periodically collect the temprature and humidity for th
 
 - **DS1307 RTC Module:** Keep track of *'Correct Time'* and fetch it when required.
 
+- **RG1602A I2C LCD Screen:** To display data locally.
 
 ## Libraries used
 
  - [For Uploading Data From ESP8266 to Ubidots](https://github.com/ubidots/ubidots-esp8266)
+
 ## Relevant Links
 
  - [Logic Behind Working of Google Geolocation](https://www.youtube.com/watch?v=Ymd71ML41vo)
