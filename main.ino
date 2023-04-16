@@ -1,11 +1,9 @@
-#include <ESP8266HTTPClient.h>
-#include <WiFiClient.h>
-#include <ArduinoJson.h>
-#include <SPI.h>  // not used here, but needed to prevent a RTClib compile error
-#include "ESP8266WiFi.h"
+#include <Wire.h> // include Wire library for I2C communication
+#include <LiquidCrystal_I2C.h> // include LiquidCrystal_I2C library for I2C LCD display
+#include <RTClib.h> // include RTClib library for rtc module
 #include "Ubidots.h"
 #include "DHT.h"
-#include "RTClib.h"
+#include <ArduinoJson.h>
 
 // API Keys and Passwords
 const char* UBIDOTS_TOKEN = "";  // Put here your Ubidots TOKEN
@@ -20,8 +18,8 @@ int DHT_PIN = 2; // PIN D4
 DHT dht(DHT_PIN, DHT11);
 
 Ubidots ubidots(UBIDOTS_TOKEN, UBI_HTTP);
-
-RTC_DS1307 RTC;  // Setting up an instance of DS1307 naming it RTC
+RTC_DS1307 rtc; // create RTC_DS1307 object
+LiquidCrystal_I2C lcd(0x27, 16, 2); // create LiquidCrystal_I2C object with I2C address 0x27, 16 columns and 2 rows
 
 float temperatureLocal = 0.0;
 float temperatureServer = 0.0;
@@ -197,16 +195,16 @@ void fetch_weather_server(){
 }
 
 void fetch_weather_local(){
-  temperatureLocal = dht.readTemperature();
-  humidityLocal = dht.readHumidity();
+    temperatureLocal = dht.readTemperature();
+    humidityLocal = dht.readHumidity();
 
-  Serial.print("Temperature Local: ");
-  Serial.print(temperatureLocal);
-  Serial.println(" °C");
+    Serial.print("Temperature Local: ");
+    Serial.print(temperatureLocal);
+    Serial.println(" °C");
 
-  Serial.print("Humidity Local: ");
-  Serial.print(humidityLocal);
-  Serial.println(" RH");
+    Serial.print("Humidity Local: ");
+    Serial.print(humidityLocal);
+    Serial.println(" RH");
 }
 
 void fetch_time_server(){
@@ -244,9 +242,9 @@ void fetch_time_server(){
         }
 
         const char* iso8601dateTime = doc["formatted"]; // "2023-04-08 19:54:11"
-        RTC.adjust(DateTime(iso8601dateTime));
+        rtc.adjust(DateTime(iso8601dateTime));
 
-        Serial.print("RTC adjusted to iso8601dateTime: ");
+        Serial.print("rtc adjusted to iso8601dateTime: ");
         Serial.println(iso8601dateTime);
       }
     }
@@ -257,15 +255,70 @@ void fetch_time_server(){
 }
 
 void fetch_time_local(){
-  DateTime now = RTC.now();
-  timeRTC = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second());
-  dateRTC = String(now.day()) + "/" + String(now.month()) + "/" + String(now.year());
+    DateTime now = rtc.now();
+    timeRTC = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second());
+    dateRTC = String(now.day()) + "/" + String(now.month()) + "/" + String(now.year());
 
-  Serial.print("Time RTC: ");
-  Serial.println(timeRTC);
+    Serial.print("Time rtc: ");
+    Serial.println(timeRTC);
 
-  Serial.print("Date RTC: ");
-  Serial.println(dateRTC);
+    Serial.print("Date rtc: ");
+    Serial.println(dateRTC);
+}
+
+void upload_data_server(){
+  ubidots.add("temperatureLocal", temperatureLocal);  // Change for your variable name
+  ubidots.add("temperatureServer", temperatureServer);
+  ubidots.add("humidityLocal", humidityLocal);
+  ubidots.add("humidityServer", humidityServer);
+
+  bool bufferSent = false;
+  bufferSent = ubidots.send("node_mcu");  // Will send data to a device label that matches the device Id
+
+  if (bufferSent) {
+    // Do something if values were sent properly
+    Serial.println("Values sent by the device");
+  }
+}
+
+void display_lcd_data(){
+  lcd.clear();
+
+  // Print the date and time values on the LCD
+  fetch_time_local();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Time: ");
+  lcd.print(timeRTC);
+  lcd.setCursor(0, 1);
+  lcd.print("Date: ");
+  lcd.print(dateRTC);
+
+  delay(3000); // Wait for 3 seconds
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Temp(L): ");
+  lcd.print(temperatureLocal);
+  lcd.print("C");
+  lcd.setCursor(0, 1);
+  lcd.print("Temp(S): ");
+  lcd.print(temperatureServer);
+  lcd.print("C");
+
+  delay(3000); // Wait for 3 seconds
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Humid(L): ");
+  lcd.print(humidityLocal);
+  lcd.print("%");
+  lcd.setCursor(0, 1);
+  lcd.print("Humid(S): ");
+  lcd.print(humidityServer);
+  lcd.print("%");
+
+//  delay(3000); // Wait for 3 seconds
 }
 
 /****************************************
@@ -273,11 +326,15 @@ void fetch_time_local(){
  ****************************************/
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   ubidots.wifiConnect(WIFI_SSID, WIFI_PASS);
   dht.begin();
-  RTC.begin();  // Initialize RTC
+  lcd.init(); // initialize I2C LCD screen
+  lcd.backlight(); // turn on backlight
+  Wire.begin(); // initialize I2C communication
+  rtc.begin(); // initialize rtc module
   fetch_location_server();
+  fetch_time_server();
 }
 
 void loop() {
@@ -285,28 +342,12 @@ void loop() {
 
   fetch_weather_local();
 
-  fetch_time_server(); // Fetch time from server and adjust this time on RTC
+  // Error handling while fetching from server
+  if(!(temperatureServer==0 && humidityServer==0)){
+    display_lcd_data();
 
-  fetch_time_local(); // Fetch time from RTC
+    upload_data_server();
+  }
 
-  delay(600000);
+  delay(1000); // wait for one second before reading the time again
 }
-
-// double value1 = random(0, 9) * 10;
-// double value2 = random(0, 9) * 100;
-// double value3 = random(0, 9) * 1000;
-// ubidots.add("Variable_Name_One", value1);  // Change for your variable name
-// ubidots.add("Variable_Name_Two", value2);
-// ubidots.add("Variable_Name_Three", value3);
-
-// bool bufferSent = false;
-// bufferSent = ubidots.send("node_mcu");  // Will send data to a device label that matches the device Id
-
-// if (bufferSent) {
-//   // Do something if values were sent properly
-//   Serial.println("Values sent by the device");
-// }
-
-// const char* DEVICE_LABEL_TO_RETRIEVE_VALUES_FROM = "nodemcu";  // Replace with your device label
-// const char* VARIABLE_LABEL_TO_RETRIEVE_VALUES_FROM = "LED";       // Replace with your variable label
-// int value = ubidots.get(DEVICE_LABEL_TO_RETRIEVE_VALUES_FROM, VARIABLE_LABEL_TO_RETRIEVE_VALUES_FROM); //To Read Values from the Control Variable
