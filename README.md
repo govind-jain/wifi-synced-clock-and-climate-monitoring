@@ -1,7 +1,11 @@
 
 # Wi-Fi Synced Clock and Climate Monitoring
 
-In this project, we will periodically collect the temprature and humidity for the nearby location of the device via local sensors as well as via API calls to Weather servers. We will send these data to an IoT cloud platform and plot the data. We will also process the data there to perform the desired actions.
+- The project uses an ESP8266 NodeMCU board to periodically collect the internal and external weather for the nearby device location via local sensors and API calls to Weather servers respectively.
+
+- We will send these data to an IoT cloud platform, plot the data, and process the data there to perform the desired actions (such as ringing an alarm in case internal and external temperature difference is higher than a threshold).
+
+- Getting the current location (required to determine current weather) is implemented without using a GPS sensor. Instead, we have used Google Geolocation API. This saved the cost, power, and physical complexity of the project.
 
 ## Architecture and Connections
 
